@@ -43,13 +43,25 @@ get_user_dn(LdapConnection, User) when User =/= <<"">>, User =/= "" ->
   end.
 
 connect() ->
-  [SearchUserDN, SearchUserPassword] = get_config(["SearchUserDN", "SearchUserPassword"]),
-  connect(SearchUserDN, SearchUserPassword).
+  case catch get_config(["SearchUserDN", "SearchUserPassword"]) of
+    {config_key_not_found, _} -> connect(anon, anon);
+    [SearchUserDN, SearchUserPassword] -> connect(SearchUserDN, SearchUserPassword)
+  end.
 
 connect(DN, Password) ->
   [LdapServers, UseSsl] = get_config(["LdapServers", "UseSsl"]),
   LdapServerList = re:split(LdapServers, "\\s*,\\s*", [{return, list}]),
-  case eldap:open(LdapServerList, [{ssl, list_to_atom(UseSsl)}]) of
+  Args = [{ssl, list_to_atom(UseSsl)}] ++
+    (case get_config(["Port"]) of
+      {config_key_not_found, _} -> [];
+      [Port] -> [{port, list_to_integer(Port)}]
+    end) ++
+    (case {DN, Password} of
+      {anon, anon} -> [{anon_auth, true}];
+      _ -> []
+    end), % ++ ([{log, fun(_,S,A) -> io:format(S,A) end}]),
+  ?LOG_DEBUG("Opening LDAP connection: ~p/~p", [LdapServerList, Args]),
+  case eldap:open(LdapServerList, Args) of
     {error, Reason} -> throw({ ldap_connection_error, Reason });
     {ok, LdapConnection} ->
       case eldap:simple_bind(LdapConnection, DN, Password) of
