@@ -44,7 +44,7 @@ get_user_dn(LdapConnection, User) when User =/= <<"">>, User =/= "" ->
 
 connect() ->
   case catch get_config(["SearchUserDN", "SearchUserPassword"]) of
-    {config_key_not_found, _} -> connect(anon, anon);
+    {config_key_not_found, _} -> connect("", "");
     [SearchUserDN, SearchUserPassword] -> connect(SearchUserDN, SearchUserPassword)
   end.
 
@@ -57,7 +57,7 @@ connect(DN, Password) ->
       [Port] -> [{port, list_to_integer(Port)}]
     end) ++
     (case {DN, Password} of
-      {anon, anon} -> [{anon_auth, true}];
+      {"", ""} -> [{anon_auth, true}];
       _ -> []
     end), % ++ ([{log, fun(_,S,A) -> io:format(S,A) end}]),
   ?LOG_DEBUG("Opening LDAP connection: ~p/~p", [LdapServerList, Args]),
